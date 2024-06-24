@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Error_AdminRights" xml:space="preserve">
+    <value>Программа не запущена с правами администратора. Пожалуйста, перезапустите программу с правами администратора.</value>
+  </data>
+  <data name="Log_LicensePathChanged" xml:space="preserve">
+    <value>Путь к лицензии изменен на: {0}</value>
+  </data>
+  <data name="Log_LicenseDeleted" xml:space="preserve">
+    <value>Файл license.dat удален.</value>
+  </data>
+  <data name="Log_LicenseCopied" xml:space="preserve">
+    <value>Скопирован файл в {0}</value>
+  </data>
+  <data name="Log_ServiceStatus" xml:space="preserve">
+    <value>Статус службы {0}: {1}</value>
+  </data>
+  <data name="Log_ServiceNotFound" xml:space="preserve">
+    <value>Служба {0} не найдена.</value>
+  </data>
+  <data name="Message_LicenseFileNotFound" xml:space="preserve">
+    <value>Файл license.dat не найден в папке Licenses.</value>
+  </data>
+  <data name="Message_LicenseCopied" xml:space="preserve">
+    <value>Скопирован файл в {0}</value>
+  </data>
+  <data name="Message_ServiceAlreadyInstalled" xml:space="preserve">
+    <value>Служба FireGuardServer уже установлена.</value>
+  </data>
+  <data name="Error_LicenseActivatorNotFound" xml:space="preserve">
+    <value>Программа LicenseActivator.exe не найдена: {0}</value>
+  </data>
+  <data name="Error_FireGuardNotFound" xml:space="preserve">
+    <value>Программа FireGuard4.exe не найдена: {0}</value>
+  </data>
+  <data name="Error_InstallScriptNotFound" xml:space="preserve">
+    <value>Файл install.bat не найден: {0}</value>
+  </data>
+  <data name="Log_ServiceInstalled" xml:space="preserve">
+    <value>Служба установлена: {0}</value>
+  </data>
+  <data name="Error_ServiceInstallTimeout" xml:space="preserve">
+    <value>Ошибка при установке службы: служба не установлена в течение ожидаемого времени.</value>
+  </data>
+  <data name="Log_ServiceDeleted" xml:space="preserve">
+    <value>Служба удалена.</value>
+  </data>
+  <data name="Log_ServiceRestarted" xml:space="preserve">
+    <value>Служба перезапущена.</value>
+  </data>
+  <data name="Error_ServiceNotInstalled" xml:space="preserve">
+    <value>Служба не установлена.</value>
+  </data>
+  <data name="Log_ServiceStopped" xml:space="preserve">
+    <value>Служба остановлена.</value>
+  </data>
+  <data name="Message_ServiceAlreadyRunning" xml:space="preserve">
+    <value>Программа уже запущена.</value>
+  </data>
+  <data name="Log_SettingsOpened" xml:space="preserve">
+    <value>Открыт файл {0}</value>
+  </data>
+  <data name="Error_SettingsFileNotFound" xml:space="preserve">
+    <value>Файл {0} не найден: {1}</value>
+  </data>
+  <data name="Message_SettingsFileAlreadyOpened" xml:space="preserve">
+    <value>Файл {0} уже открыт.</value>
+  </data>
+  <data name="Log_SettingsDeleted" xml:space="preserve">
+    <value>Файлы настроек сети удалены.</value>
+  </data>
+  <data name="Message_SettingsFilesNotFound" xml:space="preserve">
+    <value>Файлы network_settings.ini и server_network_settings.ini не найдены.</value>
+  </data>
+</root>

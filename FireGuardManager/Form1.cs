@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.ServiceProcess;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -14,7 +15,6 @@ namespace FireGuardManager
     {
         private string directoryLicenseFireGuardPath;
         private string fireGuardLicenseActivatorPath;
-        private string fireGuardExePath;
         private string installServicePath;
         private readonly string serviceName = "FireGuardServer";
         private string networkSettingsPath;
@@ -33,9 +33,9 @@ namespace FireGuardManager
         {
             directoryLicenseFireGuardPath = @"C:\ProgramData\MST\FireGuard 4 Ultimate\Licenses";
             txtLicensePath.Text = directoryLicenseFireGuardPath;
-            txtLicensePath.ReadOnly = true; // Запретить редактирование
+            txtLicensePath.ReadOnly = true;
             txtProgramFolderPath.Text = @"C:\Program Files (x86)\MST\FireGuard 4 Ultimate";
-            txtProgramFolderPath.ReadOnly = true; // Запретить редактирование
+            txtProgramFolderPath.ReadOnly = true;
 
             UpdatePathsBasedOnProgramFolder();
         }
@@ -43,17 +43,18 @@ namespace FireGuardManager
         private void UpdatePathsBasedOnProgramFolder()
         {
             fireGuardLicenseActivatorPath = Path.Combine(txtProgramFolderPath.Text, "LicenseActivator.exe");
-            fireGuardExePath = Path.Combine(txtProgramFolderPath.Text, "FireGuard4.exe");
             installServicePath = Path.Combine(txtProgramFolderPath.Text, "FireGuardServer", "install.bat");
 
-            // Получить название редакции из последней части пути программы
-            string programFolderPath = txtProgramFolderPath.Text;
-            string editionName = programFolderPath.Substring(programFolderPath.LastIndexOf("FireGuard 4 ") + "FireGuard 4 ".Length);
-
+            string editionName = GetEditionName(txtProgramFolderPath.Text);
             networkSettingsPath = $@"C:\ProgramData\MST\FireGuard 4 {editionName}\network_settings.ini";
             serverNetworkSettingsPath = $@"C:\ProgramData\MST\FireGuard 4 {editionName}\server_network_settings.ini";
 
             UpdateServiceControlButtons();
+        }
+
+        private string GetEditionName(string programFolderPath)
+        {
+            return programFolderPath.Substring(programFolderPath.LastIndexOf("FireGuard 4 ") + "FireGuard 4 ".Length);
         }
 
         private void MainForm_Load(object sender, EventArgs e)
@@ -62,8 +63,7 @@ namespace FireGuardManager
             {
                 if (!IsRunningAsAdmin())
                 {
-                    MessageBox.Show("Программа не запущена с правами администратора. Пожалуйста, перезапустите программу с правами администратора.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    Application.Exit();
+                    ShowErrorAndExit("Программа не запущена с правами администратора. Пожалуйста, перезапустите программу с правами администратора.");
                 }
                 btnClearLog.Enabled = lstLog.Items.Count > 0;
                 UpdateServiceControlButtons();
@@ -71,12 +71,20 @@ namespace FireGuardManager
             }, "проверке прав администратора");
         }
 
+        private void MainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            AddLog("Программа закрыта.");
+        }
+
+        private void ShowErrorAndExit(string message)
+        {
+            ShowError(message);
+            Application.Exit();
+        }
+
         private void InitializeServiceStatusTimer()
         {
-            serviceStatusTimer = new Timer
-            {
-                Interval = 5000 // Проверка каждые 5 секунд
-            };
+            serviceStatusTimer = new Timer { Interval = 5000 };
             serviceStatusTimer.Tick += (s, e) => UpdateServiceControlButtons();
         }
 
@@ -90,8 +98,12 @@ namespace FireGuardManager
                 {
                     directoryLicenseFireGuardPath = folderBrowserDialog.SelectedPath;
                     txtLicensePath.Text = directoryLicenseFireGuardPath;
-                    AddLog($"Путь к лицензии изменен на: {directoryLicenseFireGuardPath}");
-                    UpdateServiceControlButtons();
+                    AddLog($"Путь к лицензии обновлен: {directoryLicenseFireGuardPath}");
+
+                    if (!directoryLicenseFireGuardPath.EndsWith("Licenses"))
+                    {
+                        AddLog("Предупреждение: по указанному пути отсутствует папка Licenses.");
+                    }
                 }
             }
         }
@@ -104,84 +116,80 @@ namespace FireGuardManager
                 {
                     txtProgramFolderPath.Text = folderBrowserDialog.SelectedPath;
                     UpdatePathsBasedOnProgramFolder();
+                    AddLog($"Путь к FireGuard 4 обновлен: {txtProgramFolderPath.Text}");
                 }
             }
         }
 
         private async void BtnDeleteLicense_Click(object sender, EventArgs e)
         {
-            await ExecuteWithErrorHandlingAsync(async () =>
+            if (!directoryLicenseFireGuardPath.EndsWith("Licenses") || !Directory.Exists(directoryLicenseFireGuardPath))
             {
-                if (Directory.Exists(directoryLicenseFireGuardPath))
+                ShowError($"По указанному пути папка Licenses не существует: {directoryLicenseFireGuardPath}");
+                AddLog($"Ошибка: по указанному пути {directoryLicenseFireGuardPath} папка Licenses не существует.");
+                return;
+            }
+
+            string licenseDatPath = Path.Combine(directoryLicenseFireGuardPath, "license.dat");
+
+            if (!File.Exists(licenseDatPath))
+            {
+                ShowError($"По указанному пути файл license.dat не существует: {directoryLicenseFireGuardPath}");
+                AddLog($"Ошибка: по указанному пути {directoryLicenseFireGuardPath} файл license.dat не существует.");
+                return;
+            }
+
+            var confirmResult = MessageBox.Show("Вы уверены, что хотите удалить файл license.dat?", "Подтвердите удаление", MessageBoxButtons.YesNo);
+            if (confirmResult == DialogResult.Yes)
+            {
+                await ExecuteWithErrorHandlingAsync(async () =>
                 {
-                    string licenseDatPath = Path.Combine(directoryLicenseFireGuardPath, "license.dat");
-
-                    if (!File.Exists(licenseDatPath))
-                    {
-                        MessageBox.Show("Файл license.dat не найден в папке Licenses.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
                     if (chkCopyBeforeDelete.Checked)
                     {
                         using (var folderBrowserDialog = new FolderBrowserDialog())
                         {
                             if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
                             {
-                                string destinationPath = folderBrowserDialog.SelectedPath;
-                                await Task.Run(() => File.Copy(licenseDatPath, Path.Combine(destinationPath, "license.dat"), true));
+                                string destinationPath = Path.Combine(folderBrowserDialog.SelectedPath, "license.dat");
+                                if (directoryLicenseFireGuardPath == Path.GetDirectoryName(destinationPath))
+                                {
+                                    AddLog("Ошибка: Невозможно копировать файл в ту же папку. Удаление license.dat не выполнено.");
+                                    return;
+                                }
+                                await Task.Run(() => File.Copy(licenseDatPath, destinationPath, true));
                                 AddLog($"Скопирован файл: {licenseDatPath} в {destinationPath}");
-                            }
-                            else
-                            {
-                                return;
                             }
                         }
                     }
 
-                    await Task.Run(() => MoveToRecycleBin(licenseDatPath));
+                    MoveToRecycleBin(licenseDatPath);
                     AddLog($"Файл перемещен в корзину: {licenseDatPath}");
-                }
-                else
-                {
-                    MessageBox.Show("Директория не существует: " + directoryLicenseFireGuardPath);
-                    AddLog("Директория не существует: " + directoryLicenseFireGuardPath);
-                }
-            }, "удалении лицензий");
+                }, "удалении лицензий");
+            }
         }
 
-        private async Task CopyDirectoryAsync(string sourceDir, string destDir)
+        private async void BtnCheckServiceStatus_Click(object sender, EventArgs e)
         {
-            Directory.CreateDirectory(destDir);
-            var fileTasks = Directory.GetFiles(sourceDir).Select(async file =>
+            await ExecuteWithErrorHandlingAsync(async () =>
             {
-                string destFile = Path.Combine(destDir, Path.GetFileName(file));
-                await Task.Run(() => File.Copy(file, destFile, true));
-            });
-
-            var dirTasks = Directory.GetDirectories(sourceDir).Select(async dir =>
-            {
-                string destSubDir = Path.Combine(destDir, Path.GetFileName(dir));
-                await CopyDirectoryAsync(dir, destSubDir);
-            });
-
-            await Task.WhenAll(fileTasks.Concat(dirTasks));
+                await AddServiceStatusLogAsync(serviceName);
+            }, "проверке статуса службы");
         }
 
-        private void BtnCheckServiceStatus_Click(object sender, EventArgs e)
+        private async Task AddServiceStatusLogAsync(string serviceName)
         {
-            ExecuteWithErrorHandling(() =>
+            await Task.Run(() =>
             {
-                ServiceController service = new ServiceController(serviceName);
                 try
                 {
+                    ServiceController service = new ServiceController(serviceName);
                     AddLog($"Статус службы {serviceName}: {service.Status}");
                 }
                 catch (InvalidOperationException)
                 {
                     AddLog($"Служба {serviceName} не найдена.");
                 }
-            }, "проверке статуса службы");
+            });
         }
 
         private void BtnRunLicenseActivator_Click(object sender, EventArgs e)
@@ -190,30 +198,25 @@ namespace FireGuardManager
             {
                 if (IsProcessRunning("LicenseActivator"))
                 {
-                    MessageBox.Show("Программа LicenseActivator уже запущена.", "Уведомление", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    AddLog("Попытка запустить LicenseActivator, но программа уже запущена.");
+                    ShowMessage("Программа LicenseActivator уже запущена.");
+                    AddLog("LicenseActivator уже запущен.");
                 }
                 else if (File.Exists(fireGuardLicenseActivatorPath))
                 {
-                    var result = MessageBox.Show("Запустить LicenseActivator.exe для FireGuard 4 Ultimate?", "Запуск LicenseActivator", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result == DialogResult.Yes)
+                    if (ConfirmAction("Запустить LicenseActivator.exe для FireGuard 4 Ultimate?"))
                     {
-                        Process.Start(new ProcessStartInfo
-                        {
-                            FileName = fireGuardLicenseActivatorPath,
-                            WorkingDirectory = Path.GetDirectoryName(fireGuardLicenseActivatorPath)
-                        });
-                        AddLog("Запуск LicenseActivator.exe");
+                        StartProcess(fireGuardLicenseActivatorPath, string.Empty);
+                        AddLog("LicenseActivator успешно запущен.");
                     }
                     else
                     {
-                        AddLog("Запуск LicenseActivator.exe отменен пользователем.");
+                        AddLog("Запуск LicenseActivator отменен пользователем.");
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Программа LicenseActivator.exe не найдена: " + fireGuardLicenseActivatorPath, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Программа LicenseActivator.exe не найдена: " + fireGuardLicenseActivatorPath);
+                    ShowError($"LicenseActivator.exe не найден: {fireGuardLicenseActivatorPath}");
+                    AddLog("Ошибка: LicenseActivator не найден.");
                 }
             }, "запуске LicenseActivator.exe");
         }
@@ -222,27 +225,19 @@ namespace FireGuardManager
         {
             await ExecuteWithErrorHandlingAsync(async () =>
             {
-                ServiceController service = new ServiceController(serviceName);
                 try
                 {
-                    ServiceControllerStatus status = service.Status;
-
-                    var result = MessageBox.Show("Хотите удалить службу FireGuardServer?", "Удаление службы", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                    if (result == DialogResult.Yes)
+                    ServiceController service = new ServiceController(serviceName);
+                    if (ConfirmAction("Хотите удалить службу FireGuardServer?"))
                     {
-                        if (status != ServiceControllerStatus.Stopped)
+                        if (service.Status != ServiceControllerStatus.Stopped)
                         {
                             service.Stop();
                             await service.WaitForStatusAsync(ServiceControllerStatus.Stopped);
                             AddLog("Служба остановлена.");
                         }
 
-                        var process = new Process();
-                        process.StartInfo.FileName = "sc.exe";
-                        process.StartInfo.Arguments = $"delete {serviceName}";
-                        process.StartInfo.UseShellExecute = false;
-                        process.StartInfo.RedirectStandardOutput = true;
-                        process.Start();
+                        var process = StartProcess("sc.exe", $"delete {serviceName}");
                         await WaitForExitAsync(process);
                         AddLog("Служба удалена.");
                     }
@@ -253,8 +248,7 @@ namespace FireGuardManager
                 }
                 catch (InvalidOperationException)
                 {
-                    MessageBox.Show($"Служба {serviceName} не найдена.", "Уведомление", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    AddLog($"Служба {serviceName} не найдена.");
+                    ShowMessage($"Служба {serviceName} не найдена.");
                 }
             }, "удалении службы");
         }
@@ -263,26 +257,32 @@ namespace FireGuardManager
         {
             ExecuteWithErrorHandling(() =>
             {
+                string fireGuardExePath = Path.Combine(txtProgramFolderPath.Text, "FireGuard4.exe");
+
                 if (IsProcessRunning("FireGuard4"))
                 {
-                    MessageBox.Show("Программа FireGuard 4 Ultimate уже запущена.", "Уведомление", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    AddLog("Попытка запустить FireGuard 4 Ultimate, но программа уже запущена.");
+                    ShowMessage("Программа FireGuard 4 уже запущена.");
+                    AddLog("FireGuard 4 уже запущена.");
                 }
                 else if (File.Exists(fireGuardExePath))
                 {
-                    Process.Start(new ProcessStartInfo
+                    if (File.Exists(Path.Combine(directoryLicenseFireGuardPath, "license.dat")))
                     {
-                        FileName = fireGuardExePath,
-                        WorkingDirectory = Path.GetDirectoryName(fireGuardExePath)
-                    });
-                    AddLog("Запуск FireGuard 4 Ultimate");
+                        StartProcess(fireGuardExePath, string.Empty);
+                        AddLog("FireGuard 4 успешно запущена.");
+                    }
+                    else
+                    {
+                        AddLog("Файл license.dat не найден, запуск LicenseActivator.");
+                        BtnRunLicenseActivator_Click(sender, e);
+                    }
                 }
                 else
                 {
-                    MessageBox.Show("Программа FireGuard4.exe не найдена: " + fireGuardExePath, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Программа FireGuard4.exe не найдена: " + fireGuardExePath);
+                    ShowError($"FireGuard4.exe не найден: {fireGuardExePath}");
+                    AddLog("Ошибка: FireGuard 4 не найден.");
                 }
-            }, "запуске FireGuard 4 Ultimate");
+            }, "запуске FireGuard 4");
         }
 
         private async void BtnInstallService_Click(object sender, EventArgs e)
@@ -291,17 +291,12 @@ namespace FireGuardManager
             {
                 if (IsServiceInstalled(serviceName))
                 {
-                    MessageBox.Show("Служба FireGuardServer уже установлена.", "Уведомление", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ShowMessage("Служба FireGuardServer уже установлена.");
                     AddLog("Попытка установить службу FireGuardServer, но она уже установлена.");
                 }
                 else if (File.Exists(installServicePath))
                 {
-                    var process = Process.Start(new ProcessStartInfo
-                    {
-                        FileName = installServicePath,
-                        WorkingDirectory = Path.GetDirectoryName(installServicePath)
-                    });
-                    AddLog("Запуск install.bat для установки службы");
+                    var process = StartProcess(installServicePath, "install.bat для установки службы");
 
                     if (await WaitForServiceToBeInstalledAsync(serviceName))
                     {
@@ -315,8 +310,7 @@ namespace FireGuardManager
                 }
                 else
                 {
-                    MessageBox.Show("Файл install.bat не найден: " + installServicePath, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Файл install.bat не найден: " + installServicePath);
+                    ShowError($"Файл install.bat не найден: {installServicePath}");
                 }
             }, "установке службы");
         }
@@ -338,12 +332,10 @@ namespace FireGuardManager
 
         private void BtnClearLog_Click(object sender, EventArgs e)
         {
-            Control activeControl = ActiveControl;
             lstLog.Items.Clear();
             logCounter = 1;
             btnClearLog.Enabled = false;
             AddLog("Лог очищен.");
-            activeControl?.Focus();
         }
 
         private async void BtnOpenNetworkSettings_Click(object sender, EventArgs e)
@@ -354,11 +346,6 @@ namespace FireGuardManager
         private async void BtnOpenServerNetworkSettings_Click(object sender, EventArgs e)
         {
             await OpenSettingsFileAsync(serverNetworkSettingsPath, "server_network_settings.ini");
-        }
-
-        private void BtnDeleteNetworkSettings_Click(object sender, EventArgs e)
-        {
-            DeleteNetworkSettingsFiles();
         }
 
         private async Task OpenSettingsFileAsync(string filePath, string fileName)
@@ -378,55 +365,45 @@ namespace FireGuardManager
                     }
                     else
                     {
-                        MessageBox.Show($"Файл {fileName} не найден: {filePath}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        AddLog($"Файл {fileName} не найден: {filePath}");
+                        ShowError($"Файл {fileName} не найден: {filePath}");
                     }
                 }
                 else
                 {
-                    MessageBox.Show($"Файл {fileName} уже открыт.", "Уведомление", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    AddLog($"Попытка открыть {fileName}, но файл уже открыт.");
+                    ShowMessage($"Файл {fileName} уже открыт.");
                 }
             }, $"открытии {fileName}");
         }
 
-        private void DeleteNetworkSettingsFiles()
+        private void BtnDeleteNetworkSettings_Click(object sender, EventArgs e)
         {
             ExecuteWithErrorHandling(() =>
             {
-                bool fileExists = false;
+                DeleteFileIfExists(networkSettingsPath);
+                DeleteFileIfExists(serverNetworkSettingsPath);
 
-                if (File.Exists(networkSettingsPath))
+                if (!File.Exists(networkSettingsPath) && !File.Exists(serverNetworkSettingsPath))
                 {
-                    File.Delete(networkSettingsPath);
-                    AddLog($"Файл удален: {networkSettingsPath}");
-                    fileExists = true;
+                    ShowMessage("Файлы network_settings.ini и server_network_settings.ini не найдены.");
                 }
                 else
                 {
-                    AddLog($"Файл не найден: {networkSettingsPath}");
-                }
-
-                if (File.Exists(serverNetworkSettingsPath))
-                {
-                    File.Delete(serverNetworkSettingsPath);
-                    AddLog($"Файл удален: {serverNetworkSettingsPath}");
-                    fileExists = true;
-                }
-                else
-                {
-                    AddLog($"Файл не найден: {serverNetworkSettingsPath}");
-                }
-
-                if (!fileExists)
-                {
-                    MessageBox.Show("Файлы network_settings.ini и server_network_settings.ini не найдены.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                else
-                {
-                    MessageBox.Show("Файлы настроек сети удалены.", "Удаление файлов", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ShowMessage("Файлы настроек сети удалены.");
                 }
             }, "удалении файлов настроек сети");
+        }
+
+        private void DeleteFileIfExists(string filePath)
+        {
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                AddLog($"Файл удален: {filePath}");
+            }
+            else
+            {
+                AddLog($"Файл не найден: {filePath}");
+            }
         }
 
         private bool IsServiceInstalled(string serviceName)
@@ -457,31 +434,38 @@ namespace FireGuardManager
 
         private void AddLog(string message)
         {
-            string logEntry = $"{logCounter}: {DateTime.Now:dd-MM-yyyy HH:mm} - {message}";
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
+
             if (InvokeRequired)
             {
                 BeginInvoke(new Action(() =>
                 {
-                    lstLog.Items.Add(logEntry);
-                    lstLog.TopIndex = lstLog.Items.Count - 1;
-                    logCounter++;
-                    btnClearLog.Enabled = true;
+                    AddLogEntry(message);
                 }));
             }
             else
             {
-                lstLog.Items.Add(logEntry);
-                lstLog.TopIndex = lstLog.Items.Count - 1;
-                logCounter++;
-                btnClearLog.Enabled = true;
+                AddLogEntry(message);
             }
+        }
+
+        private void AddLogEntry(string message)
+        {
+            string logEntry = $"{logCounter}: {DateTime.Now:dd-MM-yyyy HH:mm} - {message}";
+            lstLog.Items.Add(logEntry);
+            lstLog.TopIndex = lstLog.Items.Count - 1;
+            logCounter++;
+            btnClearLog.Enabled = true;
         }
 
         private void HandleError(Exception ex, string action)
         {
             string errorMessage = $"Ошибка при {action}: {ex.Message}";
             AddLog(errorMessage);
-            MessageBox.Show(errorMessage, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            ShowError(errorMessage);
         }
 
         private void LstLog_SelectedIndexChanged(object sender, EventArgs e)
@@ -506,31 +490,95 @@ namespace FireGuardManager
         {
             ExecuteWithErrorHandling(() =>
             {
-                if (Directory.Exists(directoryLicenseFireGuardPath))
+                if (!directoryLicenseFireGuardPath.EndsWith("Licenses") || !Directory.Exists(directoryLicenseFireGuardPath))
                 {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = directoryLicenseFireGuardPath,
-                        UseShellExecute = true,
-                        Verb = "open"
-                    });
-                    AddLog($"Открыта папка лицензий: {directoryLicenseFireGuardPath}");
+                    ShowError($"По указанному пути папка Licenses не существует.");
+                    AddLog($"Ошибка: По указанному пути {directoryLicenseFireGuardPath} папка Licenses не существует.");
+                    return;
+                }
+
+                if (IsFolderOpen(directoryLicenseFireGuardPath))
+                {
+                    ShowMessage("Папка Licenses уже открыта.");
                 }
                 else
                 {
-                    MessageBox.Show("Папка с лицензией не существует: " + directoryLicenseFireGuardPath, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Папка с лицензией не существует: " + directoryLicenseFireGuardPath);
+                    StartProcess(directoryLicenseFireGuardPath, $"Открыта папка {directoryLicenseFireGuardPath}");
                 }
             }, "открытии папки с лицензиями");
+        }
+
+        private bool IsFolderOpen(string folderPath)
+        {
+            IntPtr shellWindow = IntPtr.Zero;
+            EnumWindows((hWnd, lParam) =>
+            {
+                int length = GetWindowTextLength(hWnd);
+                if (length == 0) return true;
+                StringBuilder sb = new StringBuilder(length);
+                GetWindowText(hWnd, sb, length + 1);
+                string windowText = sb.ToString();
+                if (windowText.Contains(folderPath))
+                {
+                    shellWindow = hWnd;
+                    return false;
+                }
+                return true;
+            }, IntPtr.Zero);
+            return shellWindow != IntPtr.Zero;
+        }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int GetWindowTextLength(IntPtr hWnd);
+
+        private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+        private Process StartProcess(string fileName, string arguments)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = true,
+                    WindowStyle = ProcessWindowStyle.Normal
+                }
+            };
+            process.Start();
+            return process;
+        }
+
+        private bool ConfirmAction(string message)
+        {
+            var result = MessageBox.Show(message, "Подтверждение", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            return result == DialogResult.Yes;
+        }
+
+        private void ShowMessage(string message)
+        {
+            MessageBox.Show(message, "Информация", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private void ShowError(string message)
+        {
+            MessageBox.Show(message, "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
         private async void BtnRestartService_Click(object sender, EventArgs e)
         {
             await ExecuteWithErrorHandlingAsync(async () =>
             {
-                ServiceController service = new ServiceController(serviceName);
                 if (IsServiceInstalled(serviceName))
                 {
+                    ServiceController service = new ServiceController(serviceName);
+
                     if (service.Status != ServiceControllerStatus.Stopped)
                     {
                         service.Stop();
@@ -544,8 +592,7 @@ namespace FireGuardManager
                 }
                 else
                 {
-                    MessageBox.Show("Служба не установлена.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Служба не установлена.");
+                    ShowError("Служба не установлена.");
                 }
             }, "перезапуске службы");
         }
@@ -570,8 +617,7 @@ namespace FireGuardManager
                 }
                 else
                 {
-                    MessageBox.Show("Служба не установлена.", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    AddLog("Служба не установлена.");
+                    ShowError("Служба не установлена.");
                 }
             }, "остановке службы");
         }

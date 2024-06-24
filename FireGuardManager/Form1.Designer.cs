@@ -52,7 +52,7 @@
             this.btnDeleteLicense.Name = "btnDeleteLicense";
             this.btnDeleteLicense.Size = new System.Drawing.Size(218, 28);
             this.btnDeleteLicense.TabIndex = 0;
-            this.btnDeleteLicense.Text = "Удалить файлы лицензии";
+            this.btnDeleteLicense.Text = "Удалить license.dat";
             this.btnDeleteLicense.UseVisualStyleBackColor = true;
             this.btnDeleteLicense.Click += new System.EventHandler(this.BtnDeleteLicense_Click);
             // 
@@ -103,7 +103,7 @@
             this.btnRunFireGuard.Name = "btnRunFireGuard";
             this.btnRunFireGuard.Size = new System.Drawing.Size(218, 28);
             this.btnRunFireGuard.TabIndex = 5;
-            this.btnRunFireGuard.Text = "FireGuard 4 Ultimate";
+            this.btnRunFireGuard.Text = "FireGuard 4";
             this.btnRunFireGuard.UseVisualStyleBackColor = true;
             this.btnRunFireGuard.Click += new System.EventHandler(this.BtnRunFireGuard_Click);
             // 
@@ -119,7 +119,7 @@
             // 
             // btnClearLog
             // 
-            this.btnClearLog.BackColor = System.Drawing.SystemColors.Control;
+            this.btnClearLog.BackColor = System.Drawing.Color.Blue;
             this.btnClearLog.Location = new System.Drawing.Point(12, 521);
             this.btnClearLog.Name = "btnClearLog";
             this.btnClearLog.Size = new System.Drawing.Size(230, 28);
@@ -263,7 +263,6 @@
             this.txtLicensePath.Size = new System.Drawing.Size(451, 20);
             this.txtLicensePath.TabIndex = 13;
             this.txtLicensePath.Text = "C:\\ProgramData\\MST\\FireGuard 4 Ultimate\\Licenses";
-            this.txtLicensePath.ReadOnly = true; // Запретить редактирование
             // 
             // btnSetProgramFolderPath
             // 
@@ -282,7 +281,6 @@
             this.txtProgramFolderPath.Size = new System.Drawing.Size(451, 20);
             this.txtProgramFolderPath.TabIndex = 15;
             this.txtProgramFolderPath.Text = "C:\\Program Files (x86)\\MST\\FireGuard 4 Ultimate";
-            this.txtProgramFolderPath.ReadOnly = true; // Запретить редактирование
             // 
             // MainForm
             // 
@@ -302,6 +300,7 @@
             this.Name = "MainForm";
             this.Text = "FireGuard license manager";
             this.Load += new System.EventHandler(this.MainForm_Load);
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
             this.groupBox1.ResumeLayout(false);
             this.groupBox2.ResumeLayout(false);
             this.groupBox3.ResumeLayout(false);
